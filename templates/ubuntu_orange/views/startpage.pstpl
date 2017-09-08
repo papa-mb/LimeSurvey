@@ -22,6 +22,7 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
+            <span class="navbar-brand col-xs-10 col-sm-12"><img src="{TEMPLATEURL}files/Logo-INRA-white-trans-80px.png" alt="logo INRA" title="logo INRA" /></span>
             <span class="navbar-brand col-xs-10 col-sm-12" >{SURVEYNAME}</span>
         </div>
 

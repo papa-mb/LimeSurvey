@@ -311,7 +311,7 @@ function getLanguageData($bOrderByNative = false, $sLanguageCode = 'en')
 
     // Greek
     $supportedLanguages['el']['description'] = gT('Greek');
-    $supportedLanguages['el']['nativedescription'] = '&#949;&#955;&#955;&#951;&#957;&#953;&#954;&#940;';
+    $supportedLanguages['el']['nativedescription'] = '&#917;&#955;&#955;&#951;&#957;&#953;&#954;&#940;';
     $supportedLanguages['el']['rtl'] = false;
     $supportedLanguages['el']['dateformat'] = 8;
     $supportedLanguages['el']['radixpoint'] = 1;
@@ -457,8 +457,23 @@ function getLanguageData($bOrderByNative = false, $sLanguageCode = 'en')
     $supportedLanguages['ms']['nativedescription'] = 'Bahasa Melayu';
     $supportedLanguages['ms']['rtl'] = false;
     $supportedLanguages['ms']['dateformat'] = 1;
-    $supportedLanguages['ms']['radixpoint'] = 0;
+    $supportedLanguages['ms']['radixpoint'] = 0;    
+    
+    // Malayalam
+    $supportedLanguages['ml']['description'] =  gT('Malayalam');
+    $supportedLanguages['ml']['nativedescription'] = 'Malay&#257;&#7735;a&#7745;';
+    $supportedLanguages['ml']['rtl'] = false;
+    $supportedLanguages['ml']['dateformat'] = 2;
+    $supportedLanguages['ml']['radixpoint'] = 0;
 
+    
+    // Maltese
+    $supportedLanguages['mt']['description'] = gT('Maltese');
+    $supportedLanguages['mt']['nativedescription'] = 'Malti';
+    $supportedLanguages['mt']['rtl'] = false;
+    $supportedLanguages['mt']['dateformat'] = 1;
+    $supportedLanguages['mt']['radixpoint'] = 0;
+    
     // Maltese
     $supportedLanguages['mt']['description'] = gT('Maltese');
     $supportedLanguages['mt']['nativedescription'] = 'Malti';

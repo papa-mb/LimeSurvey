@@ -259,7 +259,7 @@ class UpdateForm extends CFormModel
      */
     public function downloadUpdateUpdaterFile($tobuild)
     {
-        $getters = '/index.php?r=updates/download-updater&tobuild='.$tobuild;
+        $getters = '/index.php?r=updates/download-updater&tobuild='.$tobuild.'&frombuild='.$this->build;
         $file = $this->_performDownload($getters, 'update_updater');
         return $file;
     }
@@ -580,18 +580,19 @@ class UpdateForm extends CFormModel
                 $update_available = false;
                 if ($updates->result) {
                     unset($updates->result);
+                    if (is_array($updates) || $updates instanceof Countable) {
+                        if (count($updates) > 0) {
+                            $update_available = true;
+                            $security_update_available = false;
+                            $unstable_update_available = false;
+                            foreach ($updates as $update) {
+                                if ($update->security_update) {
+                                    $security_update_available = true;
+                                }
 
-                    if (count($updates) > 0) {
-                        $update_available = true;
-                        $security_update_available = false;
-                        $unstable_update_available = false;
-                        foreach ($updates as $update) {
-                            if ($update->security_update) {
-                                $security_update_available = true;
-                            }
-
-                            if ($update->branch != 'master') {
-                                $unstable_update_available = true;
+                                if ($update->branch != 'master') {
+                                    $unstable_update_available = true;
+                                }
                             }
                         }
                     }

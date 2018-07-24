@@ -1668,11 +1668,22 @@ class ExpressionManager
         $prettyPrint = '';
         $errors = array();
 
+        $prettyPrintIterationDone = false;
         for ($i = 1; $i <= $numRecursionLevels; ++$i) {
             // TODO - Since want to use <span> for dynamic substitution, what if there are recursive substititons?
+            $prevResult = $result;
             $result = $this->sProcessStringContainingExpressionsHelper($result, $questionNum, $staticReplacement);
+            if($result === $prevResult) {
+                // No update during process : can exit of iteration
+                if(!$prettyPrintIterationDone) {
+                    $prettyPrint = $this->prettyPrintSource;
+                }
+                // No need errors : already done
+                break;
+            }
             if ($i == $whichPrettyPrintIteration) {
                 $prettyPrint = $this->prettyPrintSource;
+                $prettyPrintIterationDone = true;
             }
             $errors = array_merge($errors, $this->RDP_errs);
         }
@@ -1962,9 +1973,19 @@ class ExpressionManager
      */
     public function asSplitStringOnExpressions($src)
     {
+        // Empty string, return an array
+        if($src === "") {
+            return array();
+        }
+        // No replacement to do, preg_split get more time than strpos
+        if(strpos($src, "{") === false || $src==="{"  || $src==="}") { 
+            return array (
+                0 => array ($src,0,'STRING')
+            );
+        };
 
+        // Seems to need split and replacement
         $parts = preg_split($this->RDP_ExpressionRegex, $src, -1, (PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE));
-
 
         $count = count($parts);
         $tokens = array();
@@ -2196,9 +2217,9 @@ class ExpressionManager
     {
         $em = new ExpressionManager();
         $output = "<div class='h3'>Functions Available within Expression Manager</div>\n";
-        $output .= "<table border='1'><tr><th>Function</th><th>Meaning</th><th>Syntax</th><th>Reference</th></tr>\n";
+        $output .= "<table border='1' class='table'><tr><th>Function</th><th>Meaning</th><th>Syntax</th><th>Reference</th></tr>\n";
         foreach ($em->RDP_ValidFunctions as $name => $func) {
-            $output .= "<tr><td>".$name."</td><td>".$func[2]."</td><td>".$func[3]."</td><td>";
+            $output .= "<thead><tr><th>".$name."</th><th>".$func[2]."</th><th>".$func[3]."</th><th>";
 
         // 508 fix, don't output empty anchor tags
         if ($func[4]) {
@@ -2209,6 +2230,16 @@ class ExpressionManager
         }
         $output .= "</table>\n";
         return $output;
+    }
+
+    /**
+     * Show a table of allowable Expression Manager functions
+     * @return string
+     */
+    static function GetAllowableFunctions()
+    {
+        $em = new ExpressionManager();
+        return $em->RDP_ValidFunctions;
     }
 
     /**

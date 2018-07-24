@@ -110,7 +110,7 @@ class CreateSurveyTest extends TestBaseClassWeb
             // Click on big "Create survey" button.
             $link = self::$webDriver->wait(10)->until(
                 WebDriverExpectedCondition::elementToBeClickable(
-                    WebDriverBy::cssSelector('#panel-1 .panel-body-link a')
+                    WebDriverBy::cssSelector('#panel-1[data-url]')
                 )
             );
             $link->click();
@@ -126,10 +126,11 @@ class CreateSurveyTest extends TestBaseClassWeb
             sleep(1);
 
             // Remove notification.
-            $save = self::$webDriver->findElement(WebDriverBy::cssSelector('button.close.limebutton'));
-            $save->click();
-
-            sleep(1);
+            // TODO: Since 2018-06-18, this does not longer work. "Cannot scroll into view". Could be
+            // a bug in Firefox, geckodriver, selenium or webdriver.
+            //$save = self::$webDriver->findElement(WebDriverBy::cssSelector('button.close.limebutton'));
+            //$save->click();
+            //sleep(1);
 
             // Go to structure sidebar
             $selectStructureSidebar = self::$webDriver->findElement(WebDriverBy::id('adminpanel__sidebar--selectorStructureButton'));
@@ -176,7 +177,7 @@ class CreateSurveyTest extends TestBaseClassWeb
             );
             $overview->click();
 
-            sleep(1);
+            sleep(2);
 
             // Click "Activate survey".
             $overview = self::$webDriver->findElement(WebDriverBy::id('ls-activate-survey'));
@@ -190,7 +191,7 @@ class CreateSurveyTest extends TestBaseClassWeb
             $overview = self::$webDriver->findElement(WebDriverBy::id('sidemenu_1_1'));
             $overview->click();
 
-            sleep(1);
+            sleep(2);
 
             // Click "Execute survey".
             $execute = self::$webDriver->wait(10)->until(

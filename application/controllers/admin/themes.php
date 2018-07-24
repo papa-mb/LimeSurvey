@@ -76,6 +76,78 @@ class themes extends Survey_Common_Action
     }
 
     /**
+    * Exports a deprecated template
+    *
+    * @access public
+    * @param string $templatename
+    * @return void
+    */
+    public function deprecatedtemplatezip($templatename)
+    {
+        //$oEditedTemplate = Template::model()->getTemplateConfiguration($templatename);
+        $templatename        = sanitize_dirname($templatename);
+        $usertemplaterootdir = Yii::app()->getConfig("uploaddir").DIRECTORY_SEPARATOR."templates";
+        $templatePath        = $usertemplaterootdir.DIRECTORY_SEPARATOR.$templatename;
+        $this->folderzip($templatename, $templatePath);
+    }
+
+    /**
+    * Exports a broken theme
+    *
+    * @access public
+    * @param string $templatename
+    * @return void
+    */
+    public function brokentemplatezip($templatename)
+    {
+        //$oEditedTemplate = Template::model()->getTemplateConfiguration($templatename);
+        $templatename        = sanitize_dirname($templatename);
+        $templatePath        = Yii::app()->getConfig("userthemerootdir").DIRECTORY_SEPARATOR.$templatename;
+        $this->folderzip($templatename, $templatePath);
+    }
+
+    /**
+    * Exports a theme folder
+    * NOTE: This function must remain private !!! it doesn't sanitize the $templatePath
+    * This should be done by the proxy function (eg: deprecatedtemplatezip(), brokentemplatezip() )
+    *
+    * @access public
+    * @param string $templatename
+    * @return void
+    */
+    private function folderzip($templatename, $templatePath)
+    {
+
+        if (!Permission::model()->hasGlobalPermission('templates','export')){
+            Yii::app()->setFlashMessage(gT("We are sorry but you don't have permissions to do this."), 'error');
+            $this->getController()->redirect(array("admin/themeoptions"));
+        }
+
+        $tempdir = Yii::app()->getConfig('tempdir');
+
+        $zipfile = "$tempdir/$templatename.zip";
+        Yii::app()->loadLibrary('admin.pclzip');
+        $zip = new PclZip($zipfile);
+        $zip->create($templatePath, PCLZIP_OPT_REMOVE_PATH, $templatePath);
+
+        if (is_file($zipfile)) {
+            // Send the file for download!
+            header("Pragma: public");
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+            header("Content-Type: application/force-download");
+            header("Content-Disposition: attachment; filename=$templatename.zip");
+            header("Content-Description: File Transfer");
+
+            @readfile($zipfile);
+
+            // Delete the temporary file
+            unlink($zipfile);
+        }
+
+    }
+
+    /**
      * Retrieves a temporary template file from disk
      *
      * @param mixed $id ID of the template file
@@ -135,13 +207,11 @@ class themes extends Survey_Common_Action
                         false
                     );
                 }
-                $checkImage = getimagesize($_FILES["file"]["tmp_name"]);
-                $debug[] = $checkImage;
-                if ($checkImage === false || !in_array($checkImage[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF])) {
-                    $uploadresult = gT("This file is not a supported image - please only upload JPG,PNG or GIF type images.");
+                $checkImage = LSYii_ImageValidator::validateImage($_FILES["file"]["tmp_name"]);
+                if ($checkImage['check'] === false) {
                     return Yii::app()->getController()->renderPartial(
                         '/admin/super/_renderJson',
-                        array('data' => ['success' => $success, 'message' => $uploadresult, 'debug' => $debug]),
+                        array('data' => ['success' => $success, 'message' => $checkImage['uploadresult'], 'debug' => $checkImage['debug']]),
                         false,
                         false
                     );
@@ -151,7 +221,7 @@ class themes extends Survey_Common_Action
                 if(Template::isStandardTemplate($oTemplateConfiguration->sTemplateName)){
                     $destdir = $oTemplateConfiguration->generalFilesPath;
                 }
-                
+
                 $filename = sanitize_filename($_FILES['file']['name'], false, false, false); // Don't force lowercase or alphanumeric
                 $fullfilepath = $destdir.$filename;
                 $debug[] = $destdir;
@@ -218,8 +288,8 @@ class themes extends Survey_Common_Action
                             }
                         }
 
-                        if (!Template::checkIfTemplateExists($sNewDirectoryName)) {
-                            Yii::app()->user->setFlash('error', gT("This ZIP archive did not contain a template. Import failed."));
+                        if (Template::checkIfTemplateExists($sNewDirectoryName)) {
+                            Yii::app()->user->setFlash('error', gT("Can not import a theme that already exists!"));
                             rmdirr($destdir);
                             $this->getController()->redirect(array("admin/themes/sa/upload"));
                         }
@@ -302,6 +372,7 @@ class themes extends Survey_Common_Action
                         $uploadresult = gT("An error occurred uploading your file. This may be caused by incorrect permissions for the application /tmp folder.");
                     } else {
                         $uploadresult = sprintf(gT("File %s uploaded"), $filename);
+                        Template::model()->findByPk($templatename)->resetAssetVersion(); // Upload a files, asset need to be resetted (maybe)
                         $status = 'success';
                     }
                 }
@@ -377,12 +448,9 @@ class themes extends Survey_Common_Action
         /* Keep Bootstrap Package clean after loading template : because template can update boostrap */
         $aBootstrapPackage = Yii::app()->clientScript->packages['bootstrap-admin'];
 
-        try {
-            $aViewUrls = $this->_initialise($templatename, $screenname, $editfile, true, true);
-        } catch (Exception $ex) {
-            Yii::app()->user->setFlash('error', $ex->getMessage());
-            $this->getController()->redirect(array('admin/themes/sa/view/', 'templatename'=>getGlobalSetting('defaulttheme')));
-        }
+
+
+        $aViewUrls = $this->_initialise($templatename, $screenname, $editfile, true, true);
 
         App()->getClientScript()->reset();
         Yii::app()->clientScript->packages['bootstrap'] = $aBootstrapPackage;
@@ -420,6 +488,7 @@ class themes extends Survey_Common_Action
 
             if (@unlink($the_full_file_path)) {
                 Yii::app()->user->setFlash('success', sprintf(gT("The file %s was deleted."), htmlspecialchars($sFileToDelete)));
+                Template::model()->findByPk($sTemplateName)->resetAssetVersion(); // Delete a files, asset need to be resetted (maybe)
             } else {
                 Yii::app()->user->setFlash('error', sprintf(gT("File %s couldn't be deleted. Please check the permissions on the /upload/themes folder"), htmlspecialchars($sFileToDelete)));
             }
@@ -542,8 +611,8 @@ class themes extends Survey_Common_Action
             if (Template::checkIfTemplateExists($templatename) && !Template::isStandardTemplate($templatename)) {
 
                 if (!Template::hasInheritance($templatename)) {
-
-                    if (rmdirr(Yii::app()->getConfig('userthemerootdir')."/".$templatename) == true) {
+                    if (rmdirr(Yii::app()->getConfig('userthemerootdir')."/".$templatename)) {
+                        Template::model()->findByPk($templatename)->deleteAssetVersion();
                         $surveys = Survey::model()->findAllByAttributes(array('template' => $templatename));
 
                         // The default template could be the same as the one we're trying to remove
@@ -570,12 +639,30 @@ class themes extends Survey_Common_Action
                 }
 
             } else {
-                // Throw an error 500 ?
+                Yii::app()->setFlashMessage(sprintf(gT("Theme '%s' does not exist."), $templatename), 'error');
             }
         } else {
             Yii::app()->setFlashMessage(gT("We are sorry but you don't have permissions to do this."), 'error');
         }
+
+
         // Redirect with default templatename, editfile and screenname
+        $this->getController()->redirect(array("admin/themeoptions"));
+    }
+
+    public function deleteBrokenTheme($templatename)
+    {
+        // First we check that the theme is really broken
+        $aBrokenThemes = Template::getBrokenThemes();
+        $templatename  = sanitize_dirname($templatename);
+        if (array_key_exists($templatename, $aBrokenThemes)) {
+            if (rmdirr(Yii::app()->getConfig('userthemerootdir')."/".$templatename)){
+                Yii::app()->setFlashMessage(sprintf(gT("Theme '%s' was successfully deleted."), $templatename));
+            }
+        }else{
+            Yii::app()->setFlashMessage(gT("Not a broken theme!"), 'error');
+        }
+
         $this->getController()->redirect(array("admin/themeoptions"));
     }
 
@@ -657,7 +744,8 @@ class themes extends Survey_Common_Action
 
                         // If the file is an asset file, we refresh asset number
                         if (in_array($relativePathEditfile, $cssfiles) || in_array($relativePathEditfile, $jsfiles)){
-                            SettingGlobal::increaseAssetsversionnumber();
+                            //SettingGlobal::increaseCustomAssetsversionnumber();
+                            Template::model()->findByPk($sTemplateName)->resetAssetVersion();
                         }
 
                         fclose($handle);
@@ -741,7 +829,7 @@ class themes extends Survey_Common_Action
             //App()->getClientScript()->reset();
             @fwrite($fnew, getHeader());
 
-            App()->getClientScript()->registerScript("activateActionLink", "activateActionLink();", CClientScript::POS_END); /* show the button if needed */
+            App()->getClientScript()->registerScript("activateActionLink", "activateActionLink();", LSYii_ClientScript::POS_POSTSCRIPT); /* show the button if needed */
 
             /* Must remove all exitsing scripts / css and js */
             App()->getClientScript()->unregisterPackage('admin-theme'); // We remove the admin package
@@ -814,18 +902,17 @@ class themes extends Survey_Common_Action
             //App()->getClientScript()->reset();
         Yii::app()->loadHelper('surveytranslator');
         Yii::app()->loadHelper('admin/template');
-        $files    = $oEditedTemplate->getValidScreenFiles("view");
-        $cssfiles = $oEditedTemplate->getValidScreenFiles("css");
 
-
-        if ($editfile == '' && $files) {
-            $editfile == $files[0];
-        }
+        $files        = $oEditedTemplate->getValidScreenFiles("view", $screenname);
+        $sLayoutFile  = $oEditedTemplate->getLayoutForScreen($screenname);
+        $sContentFile = $oEditedTemplate->getContentForScreen($screenname);
+        $cssfiles     = $oEditedTemplate->getValidScreenFiles("css");
+        $jsfiles     = $oEditedTemplate->getValidScreenFiles("js");
+        $editfile     = (empty($editfile) || ! ( in_array($editfile, $files) || in_array( $editfile ,$cssfiles) || in_array( $editfile ,$jsfiles)  )) ? $sLayoutFile : $editfile;
 
         // Standard screens
         // Only these may be viewed
         $screens = array();
-
 
         $screens['welcome']         = gT('Welcome', 'unescaped'); // first  page*
         $screens['question']        = gT('Question', 'unescaped'); // main
@@ -916,9 +1003,6 @@ class themes extends Survey_Common_Action
         $aGlobalReplacements       = array();
         $myoutput[]                = "";
 
-        $files        = $oEditedTemplate->getValidScreenFiles("view", $screenname);
-        $sLayoutFile  = $oEditedTemplate->getLayoutForScreen($screenname);
-        $sContentFile = $oEditedTemplate->getContentForScreen($screenname);
 
         switch ($screenname) {
             case 'welcome':
@@ -969,6 +1053,8 @@ class themes extends Survey_Common_Action
                 $thissurvey['aGroups'][1]["aQuestions"][1]["answer"]        = $this->getController()->renderPartial('/admin/themes/templateeditor_question_answer_view', array(), true);
                 $thissurvey['aGroups'][1]["aQuestions"][1]["help"]["show"]  = true;
                 $thissurvey['aGroups'][1]["aQuestions"][1]["help"]["text"]  = "This is some helpful text.";
+                $thissurvey['aGroups'][1]["aQuestions"][1]["class"]         = "list-radio mandatory";
+                $thissurvey['aGroups'][1]["aQuestions"][1]["attributes"]    = 'id="question42"';
 
                 // Question 2 Datas
                 $thissurvey['aGroups'][1]["aQuestions"][2]["qid"]           = "1";
@@ -979,6 +1065,8 @@ class themes extends Survey_Common_Action
                 $thissurvey['aGroups'][1]["aQuestions"][2]["answer"]        = $this->getController()->renderPartial('/admin/themes/templateeditor_question_answer_view', array('alt' => true), true);
                 $thissurvey['aGroups'][1]["aQuestions"][2]["help"]["show"]  = true;
                 $thissurvey['aGroups'][1]["aQuestions"][2]["help"]["text"]  = "This is some helpful text.";
+                $thissurvey['aGroups'][1]["aQuestions"][2]["class"]         = "text-long";
+                $thissurvey['aGroups'][1]["aQuestions"][2]["attributes"]    = 'id="question43"';
 
                 // This is just to prevent getAllClasses to retreive .ls-hidden CSS class
                 $thissurvey['aGroups'][1]["aQuestions"][1]['templateeditor'] = true;
@@ -1140,16 +1228,25 @@ class themes extends Survey_Common_Action
                 break;
         }
 
-        // NOTE: Twig already render return error, no try catch needed
+
         $thissurvey['include_content'] = $sContentFile;
-        $myoutput = Yii::app()->twigRenderer->renderTemplateForTemplateEditor(
-            $sLayoutFile,
-            array(
-                'aSurveyInfo' =>$thissurvey,
-                'print'       => $print  // Only used for PDF print layout.
-            ),
-            $oEditedTemplate
-        );
+
+
+        try {
+            $myoutput = Yii::app()->twigRenderer->renderTemplateForTemplateEditor(
+                $sLayoutFile,
+                array(
+                    'aSurveyInfo' =>$thissurvey,
+                    'print'       => $print  // Only used for PDF print layout.
+                ),
+                $oEditedTemplate
+            );
+        } catch (Exception $ex) {
+            $myoutput = "<h3>ERROR!</h3>";
+            $myoutput .= $ex->getMessage();
+        }
+
+
 
         $jsfiles        = $oEditedTemplate->getValidScreenFiles("js");
         $aCssAndJsfiles = array_merge($cssfiles, $jsfiles);
@@ -1160,7 +1257,6 @@ class themes extends Survey_Common_Action
         }
 
         $otherfiles = $oEditedTemplate->getOtherFiles();
-        $editfile = (empty($editfile)) ? $sLayoutFile : $editfile;
         $sEditfile = $oEditedTemplate->getFilePathForEditing($editfile, array_merge($files, $aCssAndJsfiles));
 
         $extension = substr(strrchr($sEditfile, "."), 1);
@@ -1189,7 +1285,6 @@ class themes extends Survey_Common_Action
             $aViewUrls = array_merge($aViewUrls, $this->_templatesummary($templatename, $screenname, $sEditfile, $editfile, $aAllTemplates, $files, $cssfiles, $jsfiles, $otherfiles, $myoutput));
         }
 
-        // App()->getClientScript()->registerScriptFile( App()->getConfig('adminscripts') . 'admin_core.js');
 
         return $aViewUrls;
     }
@@ -1209,7 +1304,7 @@ class themes extends Survey_Common_Action
             'importance' => Notification::HIGH_IMPORTANCE,
             'message'    => sprintf(
                 gT('Welcome to the new theme editor of LimeSurvey 3.0. To get an overview of new functionality and possibilities, please visit the %s LimeSurvey manual %s. For further questions and information, feel free to post your questions on the %s LimeSurvey forums %s.', 'unescaped'),
-                '<a target="_blank" href="http://manual.limesurvey.org/Templating">', '</a>',
+                '<a target="_blank" href="https://manual.limesurvey.org/New_Template_System_in_LS3.x">', '</a>',
                 '<a target="_blank" href="https://www.limesurvey.org/community/forums">', '</a>'
             )
         ));

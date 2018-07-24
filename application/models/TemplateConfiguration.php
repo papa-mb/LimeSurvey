@@ -85,6 +85,9 @@ class TemplateConfiguration extends TemplateConfig
 
     public $generalFilesPath; //Yii::app()->getConfig("userthemerootdir").DIRECTORY_SEPARATOR.'generalfiles'.DIRECTORY_SEPARATOR;
 
+    /** @var int $showpopups show warnings when running survey */
+    public $showpopups; //
+
     /**
      * @return string the associated database table name
      */
@@ -453,7 +456,8 @@ class TemplateConfiguration extends TemplateConfig
         $this->setBasics($sTemplateName, $iSurveyId);
         $this->setMotherTemplates(); // Recursive mother templates configuration
         $this->setThisTemplate(); // Set the main config values of this template
-        $this->createTemplatePackage($this); // Create an asset package ready to be loaded
+        $this->createTemplatePackage($this); // Create an asset package ready to be loaded#
+        $this->getshowpopups();
         self::$aPreparedToRender[$this->template->name][$iSurveyId][$bUseMagicInherit] = $this;
         return $this;
     }
@@ -505,14 +509,11 @@ class TemplateConfiguration extends TemplateConfig
     public function getButtons()
     {
         $sEditorUrl = Yii::app()->getController()->createUrl('admin/themes/sa/view', array("templatename"=>$this->template_name));
-        if (App()->getController()->action->id == "surveysgroups") {
-            $gisd = Yii::app()->request->getQuery('id', null);
-            $sOptionUrl    = Yii::app()->getController()->createUrl('admin/themeoptions/sa/updatesurveygroup', array("id"=>$this->id, "gsid"=>$gisd));
-        } else {
-            $sOptionUrl    = Yii::app()->getController()->createUrl('admin/themeoptions/sa/update', array("id"=>$this->id));
-        }
-
         $sUninstallUrl = Yii::app()->getController()->createUrl('admin/themeoptions/sa/uninstall/');
+        $sExtendUrl    = Yii::app()->getController()->createUrl('admin/themes/sa/templatecopy');
+        $sResetUrl     = Yii::app()->getController()->createUrl('admin/themeoptions/sa/reset/');
+        $gisd          = Yii::app()->request->getQuery('id', null);
+        $sOptionUrl    = (App()->getController()->action->id == "surveysgroups")?Yii::app()->getController()->createUrl('admin/themeoptions/sa/updatesurveygroup', array("id"=>$this->id, "gsid"=>$gisd)):Yii::app()->getController()->createUrl('admin/themeoptions/sa/update', array("id"=>$this->id));
 
         $sEditorLink = "<a
             id='template_editor_link_".$this->template_name."'
@@ -522,11 +523,7 @@ class TemplateConfiguration extends TemplateConfig
                 ".gT('Theme editor')."
             </a>";
 
-            //
-
-
         $OptionLink = '';
-
         if ($this->hasOptionPage) {
             $OptionLink .= "<a
                 id='template_options_link_".$this->template_name."'
@@ -539,24 +536,47 @@ class TemplateConfiguration extends TemplateConfig
 
         $sUninstallLink = '<a
             id="remove_fromdb_link_'.$this->template_name.'"
-            data-ajax-url="'.$sUninstallUrl.'"
+            href="'.$sUninstallUrl.'"
             data-post=\'{ "templatename": "'.$this->template_name.'" }\'
-            data-gridid = "yw0"
-            data-target="#confirmation-modal"
-            data-toggle="modal"
-            data-message="'.gT('This will delete all the specific configurations of this theme.').'<br>'.gT('Do you want to continue?').'"
-            data-tooltip="true"
-            data-title="'.gT('Uninstall this theme').'"
-            class="btn btn-danger btn-block">
+            data-text="'.gT('This will reset all the specific configurations of this theme.').'<br>'.gT('Do you want to continue?').'"
+            title="'.gT('Uninstall this theme').'"
+            class="btn btn-danger btn-block selector--ConfirmModal">
                 <span class="icon-trash"></span>
                 '.gT('Uninstall').'
             </a>';
 
+         $sExtendLink = '<a
+            id="extendthis_'.$this->template_name.'"
+            href="'.$sExtendUrl.'"
+            data-post=\''
+            .json_encode([
+                "copydir" => $this->template_name,
+                "action" => "templatecopy",
+                "newname" => ["value"=> "extends_".$this->template_name, "type" => "text", "class" => "form-control col-sm-12"]
+            ])
+            .'\'
+            data-text="'.gT('Please type in the new theme name above.').'"
+            title="'.sprintf(gT('Type in the new name to extend %s'), $this->template_name).'"
+            class="btn btn-primary btn-block selector--ConfirmModal">
+                <i class="fa fa-copy"></i>
+                '.gT('Extend').'
+            </a>';
+
+        $sResetLink = '<a
+                id="remove_fromdb_link_'.$this->template_name.'"
+                href="'.$sResetUrl.'"
+                data-post=\'{ "templatename": "'.$this->template_name.'" }\'
+                data-text="'.gT('This will reload the configuration file of this theme.').'<br>'.gT('Do you want to continue?').'"
+                title="'.gT('Reset this theme').'"
+                class="btn btn-warning btn-block selector--ConfirmModal">
+                    <span class="icon-trash"></span>
+                    '.gT('Reset').'
+            </a>';
 
         if (App()->getController()->action->id == "surveysgroups") {
             $sButtons = $OptionLink;
         } else {
-            $sButtons = $sEditorLink.$OptionLink;
+            $sButtons = $sEditorLink.$OptionLink.$sExtendLink;
 
             if ($this->template_name != getGlobalSetting('defaulttheme')) {
                 $sButtons .= $sUninstallLink;
@@ -575,8 +595,7 @@ class TemplateConfiguration extends TemplateConfig
             }
         }
 
-
-
+        $sButtons .= $sResetLink;
 
 
         return $sButtons;
@@ -600,20 +619,101 @@ class TemplateConfiguration extends TemplateConfig
         return true;
     }
 
+    /**
+     * Set a value on a given option at global setting level (survey level not affected).
+     * Will be used to turn ON ajax mode on update. 
+     *
+     * @param string $name
+     * @param mixed $value
+     * @return void
+     */
+    public function setGlobalOption($name, $value)
+    {
+        if ($this->options != 'inherit') {
+            $oOptions = json_decode($this->options);
+
+            if (empty($this->sid)) {
+                $oOptions->$name = $value;
+                $sOptions = json_encode($oOptions);
+                $this->options = $sOptions;
+                $this->save();
+            }
+        }
+    }
+
+    /**
+     * Apply options from XML configuration for all missing template options  
+     *
+     * @return void
+     */
+    public function addOptionFromXMLToLiveTheme()
+    { 
+        if ($this->options != 'inherit') {
+            $oOptions = get_object_vars(json_decode($this->options));
+            $oTemplateConfigurationModel = new TemplateManifest;
+            $oTemplateConfigurationModel->setBasics();
+            $oXmlOptions = get_object_vars($oTemplateConfigurationModel->config->options); 
+
+            // compare template options to options from the XML and add if missing
+            foreach ($oXmlOptions as $key=>$value){
+                if (!array_key_exists($key, $oOptions)){
+                  $this->addOptionToLiveTheme($key, $value);
+                }                
+            }
+        }
+    }
+
+    /**
+     * Add an option definition to the current theme.
+     * Will be used to turn ON ajax mode on update.
+     *
+     * @param string $name
+     * @param mixed $value
+     * @return void
+     */
+    public function addOptionToLiveTheme($name, $value)
+    {
+        if ($this->options != 'inherit') {
+
+            $oOptions = json_decode($this->options);
+            $oOptions->$name = $value;
+            $sOptions = json_encode($oOptions);
+            $this->options = $sOptions;
+            $this->save();
+
+        }
+    }
+
+
+    /**
+     * Set option (unless if options is set to "inherit").
+     * @param string $name
+     * @param mixed $value
+     * @return void
+     */
+    public function setOption($name, $value)
+    {
+        if ($this->options != 'inherit') {
+            $oOptions = json_decode($this->options);
+
+            $oOptions->$name = $value;
+            $sOptions = json_encode($oOptions);
+            $this->options = $sOptions;
+            $this->save();
+        }
+    }
+
     private function _filterImages($file)
     {
-        if(file_exists($this->filesPath.$file['name'])) {
-            $imagePath = $this->filesPath.$file['name'];
-            $fileRoot = './files';
-        } else {
-            $imagePath = $this->generalFilesPath.$file['name'] ;
-            $fileRoot = Yii::app()->getConfig("userthemerooturl").'/generalfiles/';
-        }
+        $imagePath = (file_exists($this->filesPath.$file['name'])) 
+            ? $this->filesPath.'/'.$file['name']
+            : $this->generalFilesPath.$file['name'] ;
 
-        
-        $checkImage = getimagesize($imagePath);
-        if (!($checkImage === false || !in_array($checkImage[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF]))) {
-                    return ['filepath' => $fileRoot.$file['name'], 'filename'=>$file['name']];
+        $filepath = App()->getAssetManager()->publish($imagePath);
+
+        $checkImage = LSYii_ImageValidator::validateImage($imagePath);
+        if (!$checkImage['check'] === false) {
+                return ['filepath' => $filepath, 'filepathOptions' => $imagePath ,'filename'=>$file['name']];
         }
     }
 
@@ -728,13 +828,6 @@ class TemplateConfiguration extends TemplateConfig
                     //Yii::app()->clientScript->removeFileFromPackage($this->sPackageName, $sType, $sFileName);
                     unset($aSettings[$key]);
                     Yii::app()->clientScript->addFileToPackage($this->oMotherTemplate->sPackageName, $sType, $sFileName);
-                    /* Old way todo
-                        $oTemplate = $this->getTemplateForFile($sFileName, $this);
-                        if (!Yii::app()->clientScript->IsFileInPackage($oTemplate->sPackageName, $sType, $sFileName)) {
-                            Yii::app()->clientScript->addFileToPackage($oTemplate->sPackageName, $sType, $sFileName);
-                            unset($aSettings[$key]);
-                        }
-                    */
                 }
             }
         }
@@ -791,7 +884,7 @@ class TemplateConfiguration extends TemplateConfig
 
     /**
      * Uninstall a theme and, display error message, and redirect to theme list
-     * @param string $sTemplateName     
+     * @param string $sTemplateName
      */
     protected function uninstallIncorectTheme($sTemplateName)
     {
@@ -1058,5 +1151,34 @@ class TemplateConfiguration extends TemplateConfig
         }
 
         return $sTemplateNames;
+    }
+
+    /**
+     * Get the global template configuration with same name as $this.
+     * The global config has no sid, no gsid and no uid.
+     * @return TemplateConfiguration
+     */
+    public function getGlobalParent()
+    {
+        return self::model()->find(
+            'sid IS NULL AND uid IS NULL and gsid IS NULL AND template_name = :template_name',
+            [':template_name'=>$this->template_name]
+        );
+    }
+
+    /**
+     * Get showpopups value from config or template configuration
+     */
+    public function getshowpopups(){
+        $config = (int)Yii::app()->getConfig('showpopups');
+        if ($config == 2){
+            if (isset($this->oOptions->showpopups)){
+                $this->showpopups = (int)$this->oOptions->showpopups; 
+            } else {
+               $this->showpopups = 1;
+           }
+        } else {
+            $this->showpopups = $config;
+        }
     }
 }

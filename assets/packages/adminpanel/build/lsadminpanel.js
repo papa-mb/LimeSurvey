@@ -36353,11 +36353,26 @@ __WEBPACK_IMPORTED_MODULE_0_vue__["a" /* default */].mixin({
     methods: {
         updatePjaxLinks: function() {
             this.$store.commit("updatePjax");
+        },
+        redoTooltips: function() {
+            try {
+                $(".btntooltip").tooltip("destroy");
+            } catch (e) {}
+            try {
+                $('[data-tooltip="true"]').tooltip("destroy");
+            } catch (e) {}
+            try {
+                $('[data-tooltip="true"]').tooltip("destroy");
+            } catch (e) {}
+
+            $(".btntooltip").tooltip();
+            $('[data-tooltip="true"]').tooltip();
+            $('[data-toggle="tooltip"]').tooltip();
         }
     }
 });
 
-$(document).on("ready", function() {
+$(document).on("ready", function () {
     const AppState = __WEBPACK_IMPORTED_MODULE_4__store_vuex_store_js__["a" /* default */](LS.globalUserId);
     if (document.getElementById("vue-app-main-container")) {
         // eslint-disable-next-line
@@ -36372,16 +36387,16 @@ $(document).on("ready", function() {
             methods: {
                 controlWindowSize() {
                     const adminmenuHeight = $("body")
-                            .find("nav")
-                            .first()
-                            .height(),
+                        .find("nav")
+                        .first()
+                        .height(),
                         footerHeight = $("body")
-                            .find("footer")
-                            .last()
-                            .height(),
+                        .find("footer")
+                        .last()
+                        .height(),
                         menuHeight = $(".menubar").outerHeight(),
                         inSurveyOffset =
-                            adminmenuHeight + footerHeight + menuHeight + 25,
+                        adminmenuHeight + footerHeight + menuHeight + 25,
                         windowHeight = window.innerHeight,
                         inSurveyViewHeight = windowHeight - inSurveyOffset;
 
@@ -36426,7 +36441,7 @@ $(document).on("ready", function() {
 
                 $(document).trigger("vue-reload-remote");
 
-                window.setInterval(function() {
+                window.setInterval(function () {
                     $(document).trigger("vue-reload-remote");
                 }, 60 * 5 * 1000);
             }
@@ -36473,13 +36488,13 @@ $(document)
         $("#pjax-file-load-container")
             .find("div")
             .css("width", "100%");
-        $("#pjaxClickInhibitor").fadeOut(400, function() {
+        $("#pjaxClickInhibitor").fadeOut(400, function () {
             $(this).remove();
         });
         $(document).trigger("vue-resize-height");
         $(document).trigger("vue-reload-remote");
         // $(document).trigger('vue-sidemenu-update-link');
-        setTimeout(function() {
+        setTimeout(function () {
             $("#pjax-file-load-container")
                 .find("div")
                 .css({
@@ -36652,7 +36667,8 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
         getMenuUrl: { type: String },
         createQuestionGroupLink: { type: String },
         createQuestionLink: { type: String },
-        updateOrderLink: { type: String }
+        updateOrderLink: { type: String },
+        isActive: { type: String }
     },
     data: () => {
         return {
@@ -36661,7 +36677,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             openSubpanelId: 0,
             questiongroups: [],
             menues: [],
-            "$store.state.isCollapsed": false,
+            collapsed: false,
             sideBarWidth: "315",
             initialPos: { x: 0, y: 0 },
             isMouseDown: false,
@@ -36923,6 +36939,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
     },
     created() {
         const self = this;
+        self.$store.commit('setSurveyActiveState', this.isActive !== "0");
         // self.$log.debug(this.$store.state);
         this.currentTab = self.$store.state.currentTab;
         this.activeMenuIndex = this.$store.state.lastMenuOpen;
@@ -37060,7 +37077,7 @@ exports = module.exports = __webpack_require__(44)(true);
 
 
 // module
-exports.push([module.i, "\n#questionexplorer {\n  overflow: auto;\n}\n", "", {"version":3,"sources":["/opt/web/LimeSurvey/assets/packages/adminpanel/src/components/subcomponents/_questionsgroups.vue"],"names":[],"mappings":";AAAA;EACE,eAAe;CAAE","file":"_questionsgroups.vue","sourcesContent":["#questionexplorer {\n  overflow: auto; }\n"],"sourceRoot":""}]);
+exports.push([module.i, "\n.display-as-container {\n  display: block;\n}\n#questionexplorer {\n  overflow: auto;\n}\n", "", {"version":3,"sources":["/opt/web/LimeSurvey/assets/packages/adminpanel/src/components/subcomponents/_questionsgroups.vue"],"names":[],"mappings":";AAAA;EACE,eAAe;CAAE;AAEnB;EACE,eAAe;CAAE","file":"_questionsgroups.vue","sourcesContent":[".display-as-container {\n  display: block; }\n\n#questionexplorer {\n  overflow: auto; }\n"],"sourceRoot":""}]);
 
 // exports
 
@@ -37102,7 +37119,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
         },
         orderedQuestionGroups() {
             return __WEBPACK_IMPORTED_MODULE_0_lodash___default.a.orderBy(this.$store.state.questiongroups, a => {
-                return parseInt(a.group_order || 999999);
+                return parseInt(a.group_order);
             }, ["asc"]);
         },
         createQuestionAllowed() {
@@ -37190,6 +37207,15 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             }
         },
         dragoverQuestiongroup($event, questiongroupObject) {
+            if (this.draggedQuestion == undefined || this.draggedQuestion == null) {
+                this.$log.error({
+                    this: this,
+                    event: $event,
+                    questiongroupObject: questiongroupObject,
+                    draggedQuestion: this.draggedQuestion
+                });
+            }
+
             if (this.questiongroupDragging) {
                 const orderSwap = questiongroupObject.group_order;
                 questiongroupObject.group_order = this.draggedQuestionGroup.group_order;
@@ -37222,7 +37248,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
         //dragevents questions
         startDraggingQuestion($event, questionObject, questionGroupObject) {
             this.$log.log("Dragging started", questionObject);
-            $event.dataTransfer.setData("text/plain", "node");
+            $event.dataTransfer.setData('application/node', this);
             this.questionDragging = true;
             this.draggedQuestion = questionObject;
             this.draggedQuestionsGroup = questionGroupObject;
@@ -37273,7 +37299,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
     }
   }, [_c('i', {
     staticClass: "fa fa-plus"
-  }), _vm._v(" " + _vm._s(_vm.translate.createQuestionGroup))]) : _vm._e(), _vm._v(" "), (_vm.createQuestionAllowed) ? _c('a', {
+  }), _vm._v(" \n            " + _vm._s(_vm.translate.createQuestionGroup) + "\n        ")]) : _vm._e(), _vm._v(" "), (_vm.createQuestionAllowed) ? _c('a', {
     staticClass: "btn btn-small btn-default ls-space margin right-10 pjax",
     attrs: {
       "id": "adminpanel__sidebar--selectorCreateQuestion",
@@ -37281,7 +37307,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
     }
   }, [_c('i', {
     staticClass: "fa fa-plus-circle"
-  }), _vm._v(" " + _vm._s(_vm.translate.createQuestion))]) : _vm._e()]) : _vm._e(), _vm._v(" "), _c('div', {
+  }), _vm._v(" \n            " + _vm._s(_vm.translate.createQuestion) + "\n        ")]) : _vm._e()]) : _vm._e(), _vm._v(" "), _c('div', {
     staticClass: "ls-flex-row ls-space padding all-0"
   }, [_c('ul', {
     staticClass: "list-group col-12",
@@ -37302,7 +37328,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
       }
     }, [_c('div', {
       staticClass: "col-12 ls-flex-row nowrap ls-space padding left-5 bottom-5"
-    }, [_c('i', {
+    }, [(!_vm.$store.state.surveyActiveState) ? _c('i', {
       staticClass: "fa fa-bars bigIcons dragPointer",
       attrs: {
         "draggable": "true"
@@ -37313,9 +37339,14 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
         },
         "dragstart": function($event) {
           _vm.startDraggingGroup($event, questiongroup)
+        },
+        "click": function($event) {
+          $event.stopPropagation();
+          $event.preventDefault();
+          (function () { return false; })($event)
         }
       }
-    }, [_vm._v(" ")]), _vm._v(" "), _c('a', {
+    }, [_vm._v("\n                         \n                    ")]) : _vm._e(), _vm._v(" "), _c('a', {
       staticClass: "col-12 pjax",
       attrs: {
         "href": questiongroup.link
@@ -37331,7 +37362,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
       style: ({
         'max-width': _vm.itemWidth
       })
-    }, [_vm._v(" " + _vm._s(questiongroup.group_name) + " ")]), _vm._v(" "), _c('span', {
+    }, [_vm._v("\n                            " + _vm._s(questiongroup.group_name) + " \n                        ")]), _vm._v(" "), _c('span', {
       staticClass: "badge pull-right ls-space margin right-5"
     }, [_vm._v(_vm._s(questiongroup.questions.length))])]), _vm._v(" "), _c('i', {
       staticClass: "fa bigIcons",
@@ -37354,17 +37385,21 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
         }
       }
     }, _vm._l((_vm.orderQuestions(questiongroup.questions)), function(question) {
-      return _c('li', {
+      return _c('div', {
         key: question.qid,
         staticClass: "list-group-item question-question-list-item ls-flex-row align-itmes-flex-between",
         class: _vm.questionItemClasses(question),
+        attrs: {
+          "data-toggle": "tootltip",
+          "title": question.question_flat
+        },
         on: {
           "dragenter": function($event) {
             _vm.dragoverQuestion($event, question, questiongroup)
           }
         }
-      }, [_c('i', {
-        staticClass: "fa fa-bars margin-right bigIcons dragPointer",
+      }, [(!_vm.$store.state.surveyActiveState) ? _c('i', {
+        staticClass: "fa fa-bars margin-right bigIcons dragPointer question-question-list-item-drag",
         attrs: {
           "draggable": "true"
         },
@@ -37374,17 +37409,21 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
           },
           "dragstart": function($event) {
             _vm.startDraggingQuestion($event, question, questiongroup)
+          },
+          "click": function($event) {
+            $event.stopPropagation();
+            $event.preventDefault();
+            (function () { return false; })($event)
           }
         }
-      }, [_vm._v(" ")]), _vm._v(" "), _c('a', {
-        staticClass: "col-12 pjax question-question-list-item-link",
+      }, [_vm._v("\n                                     \n                                ")]) : _vm._e(), _vm._v(" "), _c('a', {
+        staticClass: "col-12 pjax question-question-list-item-link display-as-container",
         attrs: {
-          "href": question.link,
-          "data-toggle": "tootltip",
-          "title": question.question_flat
+          "href": question.link
         },
         on: {
           "click": function($event) {
+            $event.stopPropagation();
             $event.preventDefault();
             _vm.openQuestion(question)
           }
@@ -37760,6 +37799,14 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             classes += menuItem.pjax ? 'pjax ' : ' ';
             classes += this.$store.state.lastMenuItemOpen == menuItem.id ? 'selected ' : ' ';
             return classes;
+        },
+        reConvertHTML(string) {
+            var chars = ["'", "©", "Û", "®", "ž", "Ü", "Ÿ", "Ý", "$", "Þ", "%", "¡", "ß", "¢", "à", "£", "á", "À", "¤", "â", "Á", "¥", "ã", "Â", "¦", "ä", "Ã", "§", "å", "Ä", "¨", "æ", "Å", "©", "ç", "Æ", "ª", "è", "Ç", "«", "é", "È", "¬", "ê", "É", "­", "ë", "Ê", "®", "ì", "Ë", "¯", "í", "Ì", "°", "î", "Í", "±", "ï", "Î", "²", "ð", "Ï", "³", "ñ", "Ð", "´", "ò", "Ñ", "µ", "ó", "Õ", "¶", "ô", "Ö", "·", "õ", "Ø", "¸", "ö", "Ù", "¹", "÷", "Ú", "º", "ø", "Û", "»", "ù", "Ü", "@", "¼", "ú", "Ý", "½", "û", "Þ", "€", "¾", "ü", "ß", "¿", "ý", "à", "‚", "À", "þ", "á", "ƒ", "Á", "ÿ", "å", "„", "Â", "æ", "…", "Ã", "ç", "†", "Ä", "è", "‡", "Å", "é", "ˆ", "Æ", "ê", "‰", "Ç", "ë", "Š", "È", "ì", "‹", "É", "í", "Œ", "Ê", "î", "Ë", "ï", "Ž", "Ì", "ð", "Í", "ñ", "Î", "ò", "‘", "Ï", "ó", "’", "Ð", "ô", "“", "Ñ", "õ", "”", "Ò", "ö", "•", "Ó", "ø", "–", "Ô", "ù", "—", "Õ", "ú", "˜", "Ö", "û", "™", "×", "ý", "š", "Ø", "þ", "›", "Ù", "ÿ", "œ", "Ú"];
+            var codes = ["&#039;", "&copy;", "&#219;", "&reg;", "&#158;", "&#220;", "&#159;", "&#221;", "&#36;", "&#222;", "&#37;", "&#161;", "&#223;", "&#162;", "&#224;", "&#163;", "&#225;", "&Agrave;", "&#164;", "&#226;", "&Aacute;", "&#165;", "&#227;", "&Acirc;", "&#166;", "&#228;", "&Atilde;", "&#167;", "&#229;", "&Auml;", "&#168;", "&#230;", "&Aring;", "&#169;", "&#231;", "&AElig;", "&#170;", "&#232;", "&Ccedil;", "&#171;", "&#233;", "&Egrave;", "&#172;", "&#234;", "&Eacute;", "&#173;", "&#235;", "&Ecirc;", "&#174;", "&#236;", "&Euml;", "&#175;", "&#237;", "&Igrave;", "&#176;", "&#238;", "&Iacute;", "&#177;", "&#239;", "&Icirc;", "&#178;", "&#240;", "&Iuml;", "&#179;", "&#241;", "&ETH;", "&#180;", "&#242;", "&Ntilde;", "&#181;", "&#243;", "&Otilde;", "&#182;", "&#244;", "&Ouml;", "&#183;", "&#245;", "&Oslash;", "&#184;", "&#246;", "&Ugrave;", "&#185;", "&#247;", "&Uacute;", "&#186;", "&#248;", "&Ucirc;", "&#187;", "&#249;", "&Uuml;", "&#64;", "&#188;", "&#250;", "&Yacute;", "&#189;", "&#251;", "&THORN;", "&#128;", "&#190;", "&#252", "&szlig;", "&#191;", "&#253;", "&agrave;", "&#130;", "&#192;", "&#254;", "&aacute;", "&#131;", "&#193;", "&#255;", "&aring;", "&#132;", "&#194;", "&aelig;", "&#133;", "&#195;", "&ccedil;", "&#134;", "&#196;", "&egrave;", "&#135;", "&#197;", "&eacute;", "&#136;", "&#198;", "&ecirc;", "&#137;", "&#199;", "&euml;", "&#138;", "&#200;", "&igrave;", "&#139;", "&#201;", "&iacute;", "&#140;", "&#202;", "&icirc;", "&#203;", "&iuml;", "&#142;", "&#204;", "&eth;", "&#205;", "&ntilde;", "&#206;", "&ograve;", "&#145;", "&#207;", "&oacute;", "&#146;", "&#208;", "&ocirc;", "&#147;", "&#209;", "&otilde;", "&#148;", "&#210;", "&ouml;", "&#149;", "&#211;", "&oslash;", "&#150;", "&#212;", "&ugrave;", "&#151;", "&#213;", "&uacute;", "&#152;", "&#214;", "&ucirc;", "&#153;", "&#215;", "&yacute;", "&#154;", "&#216;", "&thorn;", "&#155;", "&#217;", "&yuml;", "&#156;", "&#218;"];
+            __WEBPACK_IMPORTED_MODULE_0_lodash___default.a.each(codes, (code, i) => {
+                string = string.replace(code, chars[i]);
+            });
+            return string;
         }
     },
     created() {
@@ -37769,6 +37816,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
     mounted() {
         const self = this;
         this.updatePjaxLinks();
+        this.redoTooltips();
         // this.get(this.getMenuUrl, {position: 'side'}).then( (result) =>{
         //     self.$log.debug('sidemenues',result);
         //     self.menues =  _.orderBy(result.data.menues,(a)=>{return parseInt((a.order || 999999))},['desc']);
@@ -37804,7 +37852,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
       staticClass: "col-12",
       class: menuItem.menu_class,
       attrs: {
-        "title": menuItem.menu_description,
+        "title": _vm.reConvertHTML(menuItem.menu_description),
         "data-toggle": "tooltip"
       }
     }, [_c('div', {
@@ -37845,7 +37893,7 @@ module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c
       class: _vm.checkIsOpen(submenu) ? 'ls-space margin bottom-5' : '',
       attrs: {
         "href": "#",
-        "title": submenu.description,
+        "title": _vm.reConvertHTML(submenu.description),
         "data-toggle": "tooltip"
       }
     }, [_c('div', {
@@ -39485,6 +39533,7 @@ const getAppState = function (userid) {
         sidemenus: null,
         topmenus: null,
         bottommenus: null,
+        surveyActiveState: false
     };
 
     return new __WEBPACK_IMPORTED_MODULE_1_vuex__["a" /* default */].Store({
@@ -39588,6 +39637,9 @@ const getAppState = function (userid) {
             },
             updatePjax(state) {
                 $(document).trigger('pjax:refresh');           
+            },
+            setSurveyActiveState(state, surveyState) {
+                state.surveyActiveState = !!surveyState;
             }
         }
     });

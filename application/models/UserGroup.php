@@ -231,6 +231,7 @@ class UserGroup extends LSActiveRecord
      * @param integer $ugId
      * @param integer $ownerId
      * @return bool
+     * @deprecated since 2018-04-21 use $this->delete and do the permissions check in controller!!
      */
     public function deleteGroup($ugId, $ownerId)
     {
@@ -246,10 +247,23 @@ class UserGroup extends LSActiveRecord
         $group->delete();
 
         if ($group->getErrors()) {
-                    return false;
+            return false;
         } else {
-                    return true;
+            return true;
         }
+    }
+
+
+    /**
+     * {@inheritdoc}
+     */
+    public function delete()
+    {
+        if (parent::delete()) {
+            UserInGroup::model()->deleteAllByAttributes(['ugid'=>$this->primaryKey]);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -391,14 +405,13 @@ class UserGroup extends LSActiveRecord
 
         $criteria->join .= 'LEFT JOIN {{users}} AS users ON ( users.uid = t.owner_id )';
 
-        if ($isMine)
-        {
+        if ($isMine) {
             $criteria->addCondition("t.owner_id=".App()->user->getId(), "AND");
         } else {
             $criteria->addCondition("t.owner_id<>".App()->user->getId(), "AND");
             $criteria->addCondition("t.ugid IN (SELECT ugid FROM $user_in_groups_table WHERE ".$user_in_groups_table.".uid = ".App()->user->getId().")", "AND");
         }
-        
+                
         $dataProvider = new CActiveDataProvider('UserGroup', array(
             'sort'=>$sort,
             'criteria'=>$criteria,

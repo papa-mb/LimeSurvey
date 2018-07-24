@@ -229,6 +229,38 @@ function getLanguageChangerDatasPublicList($sSelectedLanguage)
 }
 
 /**
+ * Construct flash message container
+ * Used in templatereplace to replace {FLASHMESSAGE} in startpage.tstpl
+ *
+ * @return string
+ */
+function makeFlashMessage() {
+    global $surveyid;
+    $html = "";
+
+    $language = Yii::app()->getLanguage();
+    $originalPrefix = Yii::app()->user->getStateKeyPrefix();
+    // Bug in Yii? Getting the state-key prefix changes the locale, so set the language manually after.
+    Yii::app()->setLanguage($language);
+    Yii::app()->user->setStateKeyPrefix('frontend');
+
+    $mapYiiToBootstrapClass = array(
+        'error' => 'danger',
+        'success' => 'success',
+        'notice' => 'info'
+        // no warning in Yii?
+    );
+
+    foreach (Yii::app()->user->getFlashes() as $key => $message) {
+        $html .= "<div class='alert alert-" . $mapYiiToBootstrapClass[$key] . " alert-dismissible flash-" . $key . "'>" . $message . "</div>\n";
+    }
+
+    Yii::app()->user->setStateKeyPrefix($originalPrefix);
+
+    return $html;
+}
+
+/**
 * checkUploadedFileValidity used in SurveyRuntimeHelper
 */
 function checkUploadedFileValidity($surveyid, $move, $backok = null)
@@ -1263,8 +1295,8 @@ function renderRenderWayForm($renderWay, array $scenarios, $sTemplateViewPath, $
             $thissurvey["aForm"]            = $aForm;
             $thissurvey['surveyUrl']        = App()->createUrl("/survey/index", array("sid"=>$surveyid));
             $thissurvey['include_content']  = 'userforms';
-            
-            
+
+
             Yii::app()->twigRenderer->renderTemplateFromFile("layout_user_forms.twig", array('aSurveyInfo'=>$thissurvey), false);
             break;
 
@@ -1423,7 +1455,7 @@ function getNavigatorDatas()
     // SAVE BUTTON
     if ($thissurvey['allowsave'] == "Y") {
 
-        App()->getClientScript()->registerScript("activateActionLink", "activateActionLink();\n", CClientScript::POS_END);
+        App()->getClientScript()->registerScript("activateActionLink", "activateActionLink();\n", LSYii_ClientScript::POS_POSTSCRIPT);
 
         // Fill some test here, more clear ....
         $bTokenanswerspersistence   = $thissurvey['tokenanswerspersistence'] == 'Y' && tableExists('tokens_'.$surveyid);
@@ -1471,18 +1503,26 @@ function getNavigatorDatas()
  */
 function doAssessment($surveyid)
 {
-
+    /* Default : show nothing */
+    $assessment = array(
+        'show' => false,
+        'total' => array(
+            'show' => false,
+        ),
+        'subtotal' => array(
+            'show' => false,
+        ),
+    );
     $survey = Survey::model()->findByPk($surveyid);
-    $baselang = $survey->language;
-    if (Survey::model()->findByPk($surveyid)->assessments != "Y") {
-        return array('show'=>false);
-    }
 
-    $total = 0;
+    if (Survey::model()->findByPk($surveyid)->assessments != "Y") {
+        return $assessment;
+    }
+    $baselang = $survey->language;
     if (!isset($_SESSION['survey_'.$surveyid]['s_lang'])) {
         $_SESSION['survey_'.$surveyid]['s_lang'] = $baselang;
     }
-
+    $total = 0;
     $query = "SELECT * FROM {{assessments}}
         WHERE sid=$surveyid and language='".$_SESSION['survey_'.$surveyid]['s_lang']."'
         ORDER BY scope, id";
@@ -1501,6 +1541,7 @@ function doAssessment($surveyid)
                         "message" => $row['message']
                     );
                 } else {
+                    $assessment['total']['show'] = true;
                     $assessment['total'][] = array("name"=>$row['name'],
                         "min"     => $row['minimum'],
                         "max"     => $row['maximum'],
@@ -1603,27 +1644,19 @@ function doAssessment($surveyid)
                         }
                     }
                 }
-
                 $subtotal[$group] = $grouptotal;
             }
         }
-        $assessment['subtotal']['show'] = false;
 
-        if (isset($subtotal) && is_array($subtotal)) {
+        if (!empty($subtotal)) {
             $assessment['subtotal']['show']  = true;
             $assessment['subtotal']['datas'] = $subtotal;
-        }
-
-        $assessment['total']['show'] = false;
-
-        if (isset($assessment['total'])) {
-            $assessment['total']['show'] = true;
         }
 
         $assessment['subtotal_score'] = (isset($subtotal)) ? $subtotal : '';
         $assessment['total_score']    = (isset($total)) ? $total : '';
         //$aDatas     = array('total' => $total, 'assessment' => $assessment, 'subtotal' => $subtotal, );
-        return array('show'=>true, 'datas' => $assessment);
+        return array('show'=>($assessment['subtotal']['show'] || $assessment['total']['show']), 'datas' => $assessment);
 
     }
 }
@@ -1851,14 +1884,20 @@ function checkCompletedQuota($surveyid, $return = false)
     $thissurvey['aQuotas']['sPluginBlocks']      = implode("\n", $blocks);
     $thissurvey['aQuotas']['sUrlDescription']    = $sUrlDescription;
     $thissurvey['aQuotas']['sUrl']               = $sUrl;
+    $thissurvey['active']                        = 'Y';
+    
 
-    $thissurvey['aQuotas']['hiddeninputs'] = '<input type="hidden" name="sid"      value="'.$thissurvey['sid'].'" />
+    $thissurvey['aQuotas']['hiddeninputs'] = '<input type="hidden" name="sid"      value="'.$surveyid.'" />
                                                    <input type="hidden" name="token"    value="'.$thissurvey['aQuotas']['sClientToken'].'" />
                                                    <input type="hidden" name="thisstep" value="'.$thissurvey['aQuotas']['sQuotaStep'].'" />';
 
-    foreach ($thissurvey['aQuotas']['aPostedQuotaFields'] as $field => $post) {
-        $thissurvey['aQuotas']['hiddeninputs'] .= '<input type="hidden" name="'.$field.'"   value="'.$post.'" />';
+
+    if (!empty($thissurvey['aQuotas']['aPostedQuotaFields'])){
+        foreach ($thissurvey['aQuotas']['aPostedQuotaFields'] as $field => $post) {
+            $thissurvey['aQuotas']['hiddeninputs'] .= '<input type="hidden" name="'.$field.'"   value="'.$post.'" />';
+        }
     }
+
 
     //field,post in aSurveyInfo.aQuotas.aPostedQuotaFields %}
 

@@ -222,11 +222,14 @@ class export extends Survey_Common_Action
                 $exportData[$key] = array(
                     'onclick' => $event->get('onclick'),
                     'label'   => $event->get('label'),
-                    'checked' => $event->get('default', false),
                     'tooltip' => $event->get('tooltip', null)
-                    );
+                );
+                if($event->get('default', false)) {
+                    $default = $event->get('label');
+                }
             }
             $data['exports'] = $exportData; // Pass available exports
+            $data['defaultexport'] = $default;
             $data['headexports'] = array(
                 'code'=>array('label'=>gT("Question code"), 'help'=>null, 'checked'=>false),
                 'abbreviated'=>array('label'=>gT("Abbreviated question text"), 'help'=>null, 'checked'=>false),
@@ -1222,7 +1225,7 @@ class export extends Survey_Common_Action
         $tempdir = Yii::app()->getConfig("tempdir");
         $zipdir = $this->_tempdir($tempdir);
 
-        $fn = "printable_survey_".CHtml::encode($oSurvey->currentLanguageSettings->surveyls_title)."_{$oSurvey->primaryKey}.zip";
+        $fn = "printable_survey_".preg_replace('([^\w\s\d\-_~,;\[\]\(\).])','',$oSurvey->currentLanguageSettings->surveyls_title)."_{$oSurvey->primaryKey}.zip";
         $zipfile = "$tempdir/".$fn;
 
         Yii::app()->loadLibrary('admin.pclzip');
@@ -1241,13 +1244,14 @@ class export extends Survey_Common_Action
         Yii::app()->language = $siteLanguage;
 
         $this->_addHeaders($fn, "application/zip", 0);
-        if ($readFile) {
+        // if ($readFile) {
             header('Content-Transfer-Encoding: binary');
             header("Content-disposition: attachment; filename=\"".$fn."\"");
             readfile($zipfile);
             unlink($zipfile);
-        }
-        return $zipfile;
+            Yii::app()->end();
+        // }
+        //return $zipfile;
 
     }
 
@@ -1264,10 +1268,7 @@ class export extends Survey_Common_Action
     {
         $printableSurvey = new printablesurvey();
 
-        ob_start(); //Start output buffer
-        $printableSurvey->index($oSurvey->primaryKey, $language);
-        $response = ob_get_contents(); //Grab output
-        ob_end_clean(); //Discard output buffer
+        $response = $printableSurvey->index($oSurvey->primaryKey, $language, true);
 
         $file = "$tempdir/questionnaire_{$oSurvey->getPrimaryKey()}_{$language}.html";
 

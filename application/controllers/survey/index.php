@@ -37,7 +37,6 @@ class index extends CAction
         }
 
         $this->_loadRequiredHelpersAndLibraries();
-
         $param       = $this->_getParameters(func_get_args(), $_POST);
         $surveyid    = $param['sid'];
         $thisstep    = $param['thisstep'];
@@ -90,6 +89,11 @@ class index extends CAction
         if ($surveyid && $surveyExists) {
             SetSurveyLanguage($surveyid, $sDisplayLanguage);
         }
+
+        /* Launch beforeSurveyPage before all renderExitMessage */
+        $beforeSurveyPageEvent = new PluginEvent('beforeSurveyPage');
+        $beforeSurveyPageEvent->set('surveyId', $surveyid);
+        App()->getPluginManager()->dispatchEvent($beforeSurveyPageEvent);
 
         if ($this->_isClientTokenDifferentFromSessionToken($clienttoken, $surveyid)) {
             $sReloadUrl = $this->getController()->createUrl("/survey/index/sid/{$surveyid}", array('token'=>$clienttoken, 'lang'=>App()->language, 'newtest'=>'Y'));
@@ -257,7 +261,7 @@ class index extends CAction
             $aError['title'] = "Not Found!";
             $aError['message'] = "The survey in which you are trying to participate does not seem to exist. It may have been deleted or the link you were given is outdated or incorrect.";
 
-            Yii::app()->twigRenderer->renderTemplateFromFile("layout_errors.twig", array('aSurveyInfo' => array('aError' => $aError, 'adminemail' => Yii::app()->getConfig('siteadminemail'))), false);
+            Yii::app()->twigRenderer->renderTemplateFromFile("layout_errors.twig", array('aSurveyInfo' => array('aError' => $aError, 'adminemail' => Yii::app()->getConfig('siteadminemail'), 'adminname' => Yii::app()->getConfig('siteadminname') )), false);
         }
 
         // Get token
@@ -267,13 +271,9 @@ class index extends CAction
 
         //GET BASIC INFORMATION ABOUT THIS SURVEY
         $thissurvey = getSurveyInfo($surveyid, $_SESSION['survey_'.$surveyid]['s_lang']);
-
-        $event = new PluginEvent('beforeSurveyPage');
-        $event->set('surveyId', $surveyid);
-        App()->getPluginManager()->dispatchEvent($event);
-
-        if (!is_null($event->get('template'))) {
-            $thissurvey['templatedir'] = $event->get('template');
+        /* Unsure it still work, and surely better in afterFindSurvey */
+        if (!is_null($beforeSurveyPageEvent->get('template'))) {
+            $thissurvey['templatedir'] = $beforeSurveyPageEvent->get('template');
         }
 
         //SEE IF SURVEY USES TOKENS
@@ -601,10 +601,6 @@ class index extends CAction
         // } catch (WrongTemplateVersionException $ex) {
         //     echo $ex->getMessage();
         // }
-
-        if (App()->request->getPost('saveall')) {
-            App()->clientScript->registerScript("saveflashmessage", "alert('".gT("Your responses were successfully saved.", "js")."');", CClientScript::POS_READY);
-        }
     }
 
     private function _getParameters($args = array(), $post = array())
